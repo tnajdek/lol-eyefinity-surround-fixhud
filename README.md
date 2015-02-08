@@ -10,5 +10,10 @@ Requirements:
 * 64bit Windows or 64bit OSX >=10.6
 * 1-2GB of RAM available
 
+Downloads:
+----------
+Latest release (source code, binary for Windows and OSX) avaialble on Github:
+
+https://github.com/tnajdek/lol-eyefinity-surround-fixhud/releases
 
 Want to know more? http://doppnet.com/2013/08/Hacking-League-of-Legends-HUD
