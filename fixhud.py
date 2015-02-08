@@ -200,6 +200,7 @@ class Application(Frame):
 
 
 root = Tk()
+root.geometry('{}x{}'.format(640, 300))
 app = Application(master=root)
 app.mainloop()
 root.destroy()
