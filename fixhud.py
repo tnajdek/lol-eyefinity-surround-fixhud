@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
 import shutil
+import fnmatch
 
 from Tkinter import *
 from rafiki.raf.raf import RafInstallation
@@ -44,27 +45,32 @@ class Application(Frame):
 		self.createWidgets()
 
 	def process(self):
-		
 		try:
-			if(os.path.exists(self.backup_dir)):
-				shutil.rmtree(self.backup_dir)
+			target_resolution = int(self.userInput['resolution'].get())
+		except Exception:
+			return self.cancel_with_error("Resolution {} seems incorrect".format(target_resolution))
+
+		if(target_resolution < 1):
+			return self.cancel_with_error("Resolution {} seems incorrect".format(target_resolution))
+
+		self.discard_backup()
+		self.processButton.pack_forget()
+
+		try:
 			mkdir_p(self.backup_dir)
 		except Exception:
-			self.notification.set("Unable to create backup folder dir! Check permissions.")
-			self.explanation['bg'] = 'red'
-			return
+			return self.cancel_with_error("Unable to create backup folder dir! Check permissions.")
 
 		self.notification.set("Parsing raf files...")
 		self.explanation['bg'] = 'green'
 		root.update()
 
 		try:
+			self.ri.installation_path = self.userInput['lol_folder'].get()
 			collection = self.ri.get_raf_collection()
 			raffiles = collection.search(self.userInput['raf_path'].get())
 		except Exception:
-			self.notification.set("Unable to find raf collections. Check your Leagues of Legends path and try again.")
-			self.explanation['bg'] = 'red'
-			return
+			return self.cancel_with_error("Unable to find raf collections. Check your Leagues of Legends path and try again.")
 
 		self.notification.set("Creating backups...")
 		self.explanation['bg'] = 'green'
@@ -75,29 +81,71 @@ class Application(Frame):
 			target_path = os.path.join(self.backup_dir, archive.relpath)
 			mkdir_p(os.path.dirname(target_path))
 			shutil.copyfile(archive.path, target_path)
+			shutil.copyfile("{}.dat".format(archive.path), "{}.dat".format(target_path))
 
 		self.notification.set("Calculating new positions...")
 		self.explanation['bg'] = 'green'
 
+		counter = 0
 
+		for raffile in raffiles:
+			if(raffile.path.endswith('.ini')):
+				rafdata_input = raffile.extract()
+				rafdata_output = reanchor_centrally_in_raf(rafdata_input, target_resolution)
+				raffile.insert(rafdata_output)
+				counter += 1
 
+		self.notification.set("Saving updated archives...")
+		self.explanation['bg'] = 'green'
+
+		for archive in archives:
+			archive.save()
+
+		self.notification.set("Done! Updated {} raf files in {} archives. Hope it worked, enjoy!".format(counter, len(archives)))
+		self.explanation['bg'] = 'green'
+
+		self.update_buttons()
 
 	def revert_backup(self):
+		self.revertButton.pack_forget()
+		self.discardBackup.pack_forget()
+
+		self.notification.set("Preparing to revert to the backup...")
+		self.explanation['bg'] = 'green'
+		root.update()
+
 		try:
+			self.ri.installation_path = self.userInput['lol_folder'].get()
 			collection = self.ri.get_raf_collection()
 		except Exception:
-			self.notification.set("Unable to find raf collections. Check your Leagues of Legends path and try again.")
-			self.explanation['bg'] = 'red'
-			return
+			return self.cancel_with_error("Unable to find raf collections. Check your Leagues of Legends path and try again.")
 
 		backups = os.listdir(self.backup_dir)
 		for backup in backups:
-			src = backup
-			relpath = os.path.relpath(backup, self.backup_dir)
-			dest = os.join(collection.root_path, relpath)
-			print("Would copy {} to {}".format(src, dest))
+			src = os.path.join(self.backup_dir, backup)
+			dest = os.path.join(collection.root_path, backup)
+			recursive_overwrite(src, dest)
 
+		self.notification.set("Reverted to backup successfully!")
+		self.explanation['bg'] = 'green'
+		root.update()
 
+		self.update_buttons()
+
+	def discard_backup(self):
+		try:
+			if(os.path.exists(self.backup_dir)):
+				shutil.rmtree(self.backup_dir)
+			mkdir_p(self.backup_dir)
+		except Exception:
+			return self.cancel_with_error("Unable to delete backup folder dir! Check permissions.")
+
+		self.notification.set("Backup destroyed!")
+		self.explanation['bg'] = 'green'
+
+		self.update_buttons()
+
+		root.update()
 
 	def createWidgets(self):
 		self.explanation = Label(self, textvariable=self.notification, anchor="w", justify="left", bg="blue", fg="white", wraplength=640)
@@ -128,11 +176,28 @@ class Application(Frame):
 		self.userInput['resolution'].set(1920)
 		self.notification.set("This application will OVERRIDE .raf files in your Leauges of Legends directory in order to re-position GUI so playing on on multiple screens such as AMD's eyefinity or NVIDIA's Vision Surround. A BACKUP folder will be created in the same directory as this application where original .raf files will be archived")
 
-		processButton = Button(self, text="Start", command=self.process)
-		QUIT.pack({"side": "right"})
+		self.revertButton = Button(self, text="Revert to backup", command=self.revert_backup)
+		self.discardBackup = Button(self, text="Discard existing backup", command=self.discard_backup)
+		self.processButton = Button(self, text="Start", command=self.process)
+
+		self.update_buttons()
+
+	def update_buttons(self):
+		self.revertButton.pack_forget()
+		self.discardBackup.pack_forget()
+		self.processButton.pack_forget()
 
 		if(os.path.exists(self.backup_dir) and len(os.listdir(self.backup_dir))):
+			self.revertButton.pack({"side": "left"})
+			self.discardBackup.pack({"side": "right"})
 
+		else:
+			self.processButton.pack({"side": "right"})
+
+	def cancel_with_error(self, error):
+		self.notification.set(error)
+		self.explanation['bg'] = 'red'
+		self.update_buttons()
 
 
 
