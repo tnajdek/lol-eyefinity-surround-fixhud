@@ -169,9 +169,7 @@ class Application(Frame):
 		raf_path_input = Entry(self, textvariable=self.userInput['raf_path'], width=60)
 		raf_path_input.pack({"side": "top"})
 
-		# self.userInput['lol_folder'].set(self.ri.installation_path)
-		self.userInput['lol_folder'].set("/Users/doppler/tmp/lol-test/")
-		#### FIX THIS ^^^
+		self.userInput['lol_folder'].set(self.ri.installation_path)
 		self.userInput['raf_path'].set('DATA/Menu/HUD/Elements/')
 		self.userInput['resolution'].set(1920)
 		self.notification.set("This application will OVERRIDE .raf files in your Leauges of Legends directory in order to re-position GUI so playing on on multiple screens such as AMD's eyefinity or NVIDIA's Vision Surround. A BACKUP folder will be created in the same directory as this application where original .raf files will be archived")
