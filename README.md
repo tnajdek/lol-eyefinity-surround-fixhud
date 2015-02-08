@@ -1,15 +1,14 @@
-LOL AMD Eyefinity HUD Fixer
+Leauges of Legends Hud Fixer
 ====================================
 
-This will work on Windows. If you're playing on OSX, it's still usable but there is no ready made script to automate everything
+This is a simple application to make your Leauge of Legends interface work correctly on 3 or 5 monitor setups such as AMD Eyefinity or Nnvida Surround. It will center your HUD elements on the middle screen.
 
-0. Backup your League of Legends folder. All of it! zip it or copy it somewhere else.
-1. Download the zip
-2. Extract
-3. Double click "fixhud.bat"
-4. Enter path to Leauge of Legends installation. No trailing \. No qoutes. E.g. C:\League of Legends
-5. Wait 10-20 seconds
-6. Play Lol on your 3+ AMD Eyefinity/Nvidia Surround setup. Enjoy having minimap on the center monitor
+This application modifies .raf files directly in your Leagues of Legends directory. Backup will be created, make sure you don't overwrite it.
+
+Requirements:
+-------------
+* 64bit Windows or OSX
+* 1-2GB of RAM available
 
 
 Want to know more? http://doppnet.com/2013/08/Hacking-League-of-Legends-HUD
