@@ -1,6 +1,6 @@
 [submodule "hudfixer"]
 	path = hudfixer
 	url = https://github.com/tnajdek/lol-eyefinity-hud-fixer.git
-[submodule "rafiki"]
-	path = rafiki
-	url = https://github.com/tnajdek/rafiki.git
+[submodule "lol-clarity"]
+	path = clarity
+	url = git@github.com:tnajdek/lol-clarity.git

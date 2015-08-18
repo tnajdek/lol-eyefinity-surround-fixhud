@@ -4,11 +4,49 @@ import shutil
 import fnmatch
 
 from Tkinter import *
-from rafiki.raf.raf import RafInstallation
-from rafiki.raf.utils import mkdir_p
-from hudfixer.hud import reanchor_centrally_in_raf
+from rafiki import RafInstallation
+from rafiki.utils import mkdir_p
+from clarity import Clarity
+from clarity.hud import Vec2, Rect, LolRect, get_lol_scaled_rect, get_abs_scaled_rect
+
 
 SCRIPT_ROOT = os.path.dirname(os.path.realpath(__file__))
+
+# Max value LOL will allow vertically from the anchor point
+# e.g. if anchor point is 1,1 and Rect start is 0,0 then
+# rect will be placed MAGIC_VALUE pixels from the right-most
+# screen edge
+MAGIC_VALUE = 1440.0
+
+
+def reanchor_centrally(ui_element, target_resolution):
+	# lol_scalled = LolRect(ui_element.position, ui_element.resolution)
+	rect = ui_element.position
+	anchor_src = ui_element.anchor
+	RATIO = target_resolution / MAGIC_VALUE
+	offset = (RATIO - 1.0) / 2.0
+	new_rect = Rect(
+		Vec2(
+			rect.start.x,
+			rect.start.y
+		),
+
+		Vec2(
+			rect.end.x,
+			rect.end.y
+		)
+	)
+	
+	if(anchor_src.x == 1.0):
+		new_rect.start.x = rect.start.x + offset * target_resolution
+		new_rect.end.x = rect.end.x + offset * target_resolution
+	elif(anchor_src.x == 0.0):
+		new_rect.start.x = rect.start.x - offset * target_resolution
+		new_rect.end.x = rect.end.x - offset * target_resolution
+	elif(anchor_src.x != 0.5):
+		raise NotImplementedError()
+	
+	return new_rect
 
 def recursive_overwrite(src, dest, ignore=None):
 	if os.path.isdir(src):
@@ -89,9 +127,20 @@ class Application(Frame):
 		counter = 0
 
 		for raffile in raffiles:
-			if(raffile.path.endswith('.ini')):
+			if(raffile.path.endswith('.bin')):
 				rafdata_input = raffile.extract()
-				rafdata_output = reanchor_centrally_in_raf(rafdata_input, target_resolution)
+				ui = Clarity(rafdata_input)
+
+				for name, item in ui.elements.items():
+					if(item.anchor.x == 1.0 or item.anchor.x == 0.0):
+						print("{}".format(name))
+						print("\t before: {},{},{},{}".format(item.position.start.x, item.position.start.y, item.position.end.x, item.position.end.y))
+						item.position = reanchor_centrally(item, target_resolution)
+						print("\t after: {},{},{},{}".format(item.position.start.x, item.position.start.y, item.position.end.x, item.position.end.y))
+						print("----------------------------")
+						item.anchor = Vec2(0.5, item.anchor.y)
+
+				rafdata_output = ui.to_binary()
 				raffile.insert(rafdata_output)
 				counter += 1
 
@@ -170,7 +219,7 @@ class Application(Frame):
 		raf_path_input.pack({"side": "top"})
 
 		self.userInput['lol_folder'].set(self.ri.installation_path)
-		self.userInput['raf_path'].set('DATA/Menu/HUD/Elements/')
+		self.userInput['raf_path'].set('DATA/Menu/HUD/RenderUI/Clarity_RenderUI.bin')
 		self.userInput['resolution'].set(1920)
 		self.notification.set("This application will OVERRIDE .raf files in your Leauges of Legends directory in order to re-position GUI so playing on on multiple screens such as AMD's eyefinity or NVIDIA's Vision Surround. A BACKUP folder will be created in the same directory as this application where original .raf files will be archived")
 
