@@ -1,2 +1,2 @@
 lol-clarity==0.3.0
-rafiki==0.4.2
+rafiki==0.4.3
