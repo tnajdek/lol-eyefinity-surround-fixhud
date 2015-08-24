@@ -1,2 +1,2 @@
-lol-clarity
-rafiki
+lol-clarity==0.3.0
+rafiki==0.4.2

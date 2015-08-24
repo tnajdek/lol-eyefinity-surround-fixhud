@@ -2,6 +2,7 @@
 import os
 import shutil
 import fnmatch
+import hashlib
 
 from Tkinter import *
 from rafiki import RafInstallation
@@ -36,17 +37,18 @@ def reanchor_centrally(ui_element, target_resolution):
 			rect.end.y
 		)
 	)
-	
+
 	if(anchor_src.x == 1.0):
-		new_rect.start.x = rect.start.x + offset * target_resolution
-		new_rect.end.x = rect.end.x + offset * target_resolution
+		new_rect.start.x = round(rect.start.x + offset * target_resolution, 1)
+		new_rect.end.x = round(rect.end.x + offset * target_resolution, 1)
 	elif(anchor_src.x == 0.0):
-		new_rect.start.x = rect.start.x - offset * target_resolution
-		new_rect.end.x = rect.end.x - offset * target_resolution
+		new_rect.start.x = round(rect.start.x - offset * target_resolution, 1)
+		new_rect.end.x = round(rect.end.x - offset * target_resolution, 1)
 	elif(anchor_src.x != 0.5):
 		raise NotImplementedError()
 	
 	return new_rect
+
 
 def recursive_overwrite(src, dest, ignore=None):
 	if os.path.isdir(src):
@@ -78,6 +80,7 @@ class Application(Frame):
 		self.pack()
 
 		self.ri = RafInstallation()
+		self.rm = self.ri.get_raf_manifest()
 		self.backup_dir = os.path.join(SCRIPT_ROOT, 'backup')
 		self.userInput['lol_folder'].set(self.ri.installation_path)
 		self.createWidgets()
@@ -110,47 +113,69 @@ class Application(Frame):
 		except Exception:
 			return self.cancel_with_error("Unable to find raf collections. Check your Leagues of Legends path and try again.")
 
-		self.notification.set("Creating backups...")
+
+		# decide which raffile is from the most recent archive
+		max_version_seen = 0
+		for raffile in raffiles:
+			if(raffile.archive.lol_version > max_version_seen):
+				latest_raffile = raffile
+
+		raffile = latest_raffile
+		archive = raffile.archive
+		actual_path = self.rm.find(raffile.path)[0]
+
+		#backup relevant archive
+		self.notification.set("Creating backups...")	
 		self.explanation['bg'] = 'green'
 		root.update()
 
-		archives = set([raffile.archive for raffile in raffiles])
-		for archive in archives:
-			target_path = os.path.join(self.backup_dir, archive.relpath)
-			mkdir_p(os.path.dirname(target_path))
-			shutil.copyfile(archive.path, target_path)
-			shutil.copyfile("{}.dat".format(archive.path), "{}.dat".format(target_path))
+		# backup archive			
+		target_path = os.path.join(self.backup_dir, 'filearchives', archive.relpath)
+		mkdir_p(os.path.dirname(target_path))
+		shutil.copyfile(archive.path, target_path)
+		shutil.copyfile("{}.dat".format(archive.path), "{}.dat".format(target_path))
+
+		rlsmanifest_target_path = os.path.join(self.backup_dir, 'releases', self.rm.lol_version, 'releasemanifest')
+		mkdir_p(os.path.dirname(rlsmanifest_target_path))
+		shutil.copyfile(self.rm.path, rlsmanifest_target_path)
 
 		self.notification.set("Calculating new positions...")
 		self.explanation['bg'] = 'green'
 
+		# extract data
+		rafdata_input = raffile.extract()
+
+		# sanity check
+		assert self.rm.file_tree[actual_path]['size'] == len(raffile.data)
+		assert self.rm.file_tree[actual_path]['md5'] == hashlib.md5(raffile.data).digest()
+		assert self.rm.file_tree[actual_path]['compressed_size'] == len(raffile.raw_data)
+
+		# calc new position
+		ui = Clarity.from_binary(rafdata_input)
 		counter = 0
-
-		for raffile in raffiles:
-			if(raffile.path.endswith('.bin')):
-				rafdata_input = raffile.extract()
-				ui = Clarity(rafdata_input)
-
-				for name, item in ui.elements.items():
-					if(item.anchor.x == 1.0 or item.anchor.x == 0.0):
-						print("{}".format(name))
-						print("\t before: {},{},{},{}".format(item.position.start.x, item.position.start.y, item.position.end.x, item.position.end.y))
-						item.position = reanchor_centrally(item, target_resolution)
-						print("\t after: {},{},{},{}".format(item.position.start.x, item.position.start.y, item.position.end.x, item.position.end.y))
-						print("----------------------------")
-						item.anchor = Vec2(0.5, item.anchor.y)
-
-				rafdata_output = ui.to_binary()
-				raffile.insert(rafdata_output)
+		for name, item in ui.elements.items():
+			# print("{}: {}".format(name, item.anchor.x))
+			if(item.anchor.x == 1.0 or item.anchor.x == 0.0):
+				item.position = reanchor_centrally(item, target_resolution)
+				item.anchor = Vec2(0.5, item.anchor.y)
 				counter += 1
+		
+		# store new raffile contents
+		rafdata_output = ui.to_binary()
+		raffile.insert(rafdata_output)
 
-		self.notification.set("Saving updated archives...")
+		# update the manifest		
+		self.rm.file_tree[actual_path]['size'] = len(raffile.data)
+		self.rm.file_tree[actual_path]['compressed_size'] = len(raffile.raw_data)
+		self.rm.file_tree[actual_path]['md5'] = hashlib.md5(raffile.data).digest()
+
+		self.notification.set("Saving updated archive...")
 		self.explanation['bg'] = 'green'
 
-		for archive in archives:
-			archive.save()
+		archive.save()
+		self.rm.save()
 
-		self.notification.set("Done! Updated {} raf files in {} archives. Hope it worked, enjoy!".format(counter, len(archives)))
+		self.notification.set("Done! Repositioned {} elements of the UI. Hope it worked, enjoy!".format(counter))
 		self.explanation['bg'] = 'green'
 
 		self.update_buttons()
@@ -169,11 +194,15 @@ class Application(Frame):
 		except Exception:
 			return self.cancel_with_error("Unable to find raf collections. Check your Leagues of Legends path and try again.")
 
-		backups = os.listdir(self.backup_dir)
+		backups = os.listdir(os.path.join(self.backup_dir, 'filearchives'))
 		for backup in backups:
-			src = os.path.join(self.backup_dir, backup)
+			src = os.path.join(self.backup_dir, 'filearchives', backup)
 			dest = os.path.join(collection.root_path, backup)
 			recursive_overwrite(src, dest)
+
+		manifest_backup = os.path.join(self.backup_dir, 'releases', self.ri.get_raf_manifest().lol_version, 'releasemanifest')
+		manifest_target = self.ri.get_raf_manifest().path
+		recursive_overwrite(manifest_backup, manifest_target)
 
 		self.notification.set("Reverted to backup successfully!")
 		self.explanation['bg'] = 'green'
