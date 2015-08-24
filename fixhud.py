@@ -80,7 +80,6 @@ class Application(Frame):
 		self.pack()
 
 		self.ri = RafInstallation()
-		self.rm = self.ri.get_raf_manifest()
 		self.backup_dir = os.path.join(SCRIPT_ROOT, 'backup')
 		self.userInput['lol_folder'].set(self.ri.installation_path)
 		self.createWidgets()
@@ -108,6 +107,7 @@ class Application(Frame):
 
 		try:
 			self.ri.installation_path = self.userInput['lol_folder'].get()
+			self.rm = self.ri.get_raf_manifest()
 			collection = self.ri.get_raf_collection()
 			raffiles = collection.search(self.userInput['raf_path'].get())
 		except Exception:
